@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Join Date Checker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: #0d1117;
+            height: 100vh; /* 设置高度为100视窗高度 */
+            display: flex;
+            justify-content: center; /* 水平居中 */
+            align-items: center; /* 垂直居中 */
+            color: #c9d1d9;
+            position: relative; /* 为了定位右上角按钮 */
+        }
+
+        /* 右上角语言切换 */
+        .lang-switch {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            border: 1px solid #30363d;
+            color: #8b949e;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .lang-switch:hover {
+            border-color: #58a6ff;
+            color: #58a6ff;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+            padding: 0 20px;
+            text-align: center; /* 内部文字居中 */
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 24px;
+            color: #f0f6fc;
+        }
+        h1 span { color: #58a6ff; }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            background: #161b22;
+            color: #f0f6fc;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-box input:focus { border-color: #58a6ff; }
+        .search-box input::placeholder { color: #484f58; }
+
+        .search-box button {
+            padding: 12px 20px;
+            background: #238636;
+            color: #fff;
+            border: 1px solid #2ea043;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .search-box button:hover { background: #2ea043; }
+
+        /* 结果卡片 */
+        .result-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 30px 20px;
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-icon { font-size: 48px; margin-bottom: 16px; }
+        
+        .result-date {
+            font-size: 20px;
+            font-weight: 600;
+            color: #f0f6fc;
+            margin-bottom: 10px;
+        }
+
+        .result-duration {
+            font-size: 15px;
+            color: #8b949e;
+            line-height: 1.6;
+        }
+
+        .result-duration strong {
+            color: #c9d1d9;
+            font-size: 16px;
+        }
+
+        .error-msg {
+            color: #f85149;
+            font-size: 14px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .loading { display: none; color: #8b949e; margin-bottom: 16px; font-size: 14px;}
+    </style>
+</head>
+<body>
+
+    <button class="lang-switch" onclick="toggleLang()">EN / 中</button>
+
+    <div class="container">
+        <h1 id="mainTitle">GitHub <span>注册时间</span>查询</h1>
+
+        <div class="search-box">
+            <input type="text" id="username" placeholder="输入 GitHub 用户名" autofocus>
+            <button onclick="check()" id="btnSearch">查询</button>
+        </div>
+
+        <div id="error" class="error-msg"></div>
+        <div id="loading" class="loading">正在查询...</div>
+
+        <div id="card" class="result-card">
+            <div class="result-icon">🎂</div>
+            <div class="result-date" id="joinDate"></div>
+            <div class="result-duration" id="joinDuration"></div>
+        </div>
+    </div>
+
+    <script>
+        // 语言配置
+        const i18n = {
+            zh: {
+                title: 'GitHub <span>注册时间</span>查询',
+                placeholder: '输入 GitHub 用户名',
+                btnSearch: '查询',
+                loading: '正在查询...',
+                errorEmpty: '请输入用户名',
+                error404: '用户不存在',
+                error403: '请求过于频繁，请稍后再试',
+                errorNet: '网络错误，请检查连接',
+                durationLabel: '已注册',
+                daysTotal: '共',
+                dayUnit: '天',
+                yearUnit: '年',
+                monthUnit: '个月',
+                dayUnitShort: '天'
+            },
+            en: {
+                title: 'GitHub <span>Join Date</span> Checker',
+                placeholder: 'Enter GitHub Username',
+                btnSearch: 'Check',
+                loading: 'Loading...',
+                errorEmpty: 'Please enter a username',
+                error404: 'User not found',
+                error403: 'Rate limit exceeded. Please try again later.',
+                errorNet: 'Network error. Please check connection.',
+                durationLabel: 'Joined',
+                daysTotal: 'Total:',
+                dayUnit: 'days',
+                yearUnit: 'years',
+                monthUnit: 'months',
+                dayUnitShort: 'days'
+            }
+        };
+
+        let currentLang = 'zh';
+
+        function toggleLang() {
+            currentLang = currentLang === 'zh' ? 'en' : 'zh';
+            updateUI();
+        }
+
+        function updateUI() {
+            const t = i18n[currentLang];
+            document.getElementById('mainTitle').innerHTML = t.title;
+            document.getElementById('username').placeholder = t.placeholder;
+            document.getElementById('btnSearch').innerText = t.btnSearch;
+            document.getElementById('loading').innerText = t.loading;
+            // 如果有错误信息，也需要更新，但这里简单起见，重置状态
+            document.getElementById('error').style.display = 'none';
+        }
+
+        input = document.getElementById('username');
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
+
+        async function check() {
+            const user = input.value.trim();
+            const t = i18n[currentLang];
+            const errEl = document.getElementById('error');
+            const loadEl = document.getElementById('loading');
+            const cardEl = document.getElementById('card');
+
+            errEl.style.display = 'none';
+            cardEl.style.display = 'none';
+            
+            if (!user) {
+                errEl.textContent = t.errorEmpty;
+                errEl.style.display = 'block';
+                return;
+            }
+
+            loadEl.style.display = 'block';
+
+            try {
+                const res = await fetch(`https://api.github.com/users/${encodeURIComponent(user)}`);
+                
+                if (res.status === 404) throw new Error('404');
+                if (res.status === 403) throw new Error('403');
+                if (!res.ok) throw new Error('net');
+
+                const data = await res.json();
+                renderTime(data.created_at);
+
+            } catch (e) {
+                if (e.message === '404') errEl.textContent = t.error404;
+                else if (e.message === '403') errEl.textContent = t.error403;
+                else errEl.textContent = t.errorNet;
+                
+                errEl.style.display = 'block';
+            } finally {
+                loadEl.style.display = 'none';
+            }
+        }
+
+        function renderTime(dateStr) {
+            const t = i18n[currentLang];
+            const created = new Date(dateStr);
+            const now = new Date();
+            
+            // 计算总天数
+            const diffTime = Math.abs(now - created);
+            const totalDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            // 计算年月日
+            let years = now.getFullYear() - created.getFullYear();
+            let months = now.getMonth() - created.getMonth();
+            let days = now.getDate() - created.getDate();
+
+            if (days < 0) {
+                months--;
+                const lastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+                days += lastMonth.getDate();
+            }
+            if (months < 0) {
+                years--;
+                months += 12;
+            }
+
+            // 格式化日期
+            let dateFormatted;
+            if (currentLang === 'zh') {
+                dateFormatted = `${created.getFullYear()} 年 ${created.getMonth() + 1} 月 ${created.getDate()} 日`;
+            } else {
+                const options = { year: 'numeric', month: 'long', day: 'numeric' };
+                dateFormatted = created.toLocaleDateString('en-US', options);
+            }
+            
+            // 格式化时长
+            let durationText = '';
+            if (years > 0) durationText += `${years} ${t.yearUnit} `;
+            if (months > 0) durationText += `${months} ${t.monthUnit} `;
+            durationText += `${days} ${t.dayUnitShort}`;
+
+            document.getElementById('joinDate').textContent = dateFormatted;
+            document.getElementById('joinDuration').innerHTML = 
+                `${t.durationLabel} <strong>${durationText.trim()}</strong><br>(${t.daysTotal} ${totalDays.toLocaleString()} ${t.dayUnit})`;
+            
+            document.getElementById('card').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
