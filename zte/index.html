@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZTE 解锁密码计算器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(135deg, #e8f0ff 0%, #f7f7fa 100%);
+            font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .card {
+            background: #ffffff;
+            width: 100%;
+            max-width: 360px;
+            padding: 36px 28px;
+            border-radius: 18px;
+            box-shadow: 0 8px 30px rgba(45, 124, 247, 0.12);
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            box-shadow: 0 12px 40px rgba(45, 124, 247, 0.18);
+        }
+        h2 {
+            text-align: center;
+            color: #2d7cf7;
+            font-size: 24px;
+            margin-bottom: 16px;
+            letter-spacing: 1px;
+        }
+        .desc-tip {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.6;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .desc-tip b {
+            color: #2d7cf7;
+        }
+        .input-box label {
+            display: block;
+            font-size: 15px;
+            color: #333;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        #imei {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid #dde3ee;
+            border-radius: 10px;
+            font-size: 18px;
+            transition: 0.25s;
+            outline: none;
+        }
+        #imei:focus {
+            border-color: #2d7cf7;
+            box-shadow: 0 0 0 3px rgba(45, 124, 247, 0.15);
+        }
+        .btn-calc {
+            width: 100%;
+            margin-top: 20px;
+            padding: 13px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 17px;
+            font-weight: 500;
+            color: #fff;
+            background: linear-gradient(90deg, #2d7cf7, #0060e6);
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+        .btn-calc:hover {
+            background: linear-gradient(90deg, #1868e0, #004fc4);
+            transform: translateY(-2px);
+        }
+        .btn-calc:active {
+            transform: translateY(0);
+        }
+        .result-wrap {
+            margin-top: 24px;
+            padding: 14px;
+            background: #f0f9ff;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+        }
+        .result-text {
+            font-size: 20px;
+            font-weight: bold;
+            color: #0f8538;
+            letter-spacing: 2px;
+        }
+        .copy-btn {
+            margin-top: 10px;
+            padding: 6px 16px;
+            border: 1px solid #2d7cf7;
+            background: transparent;
+            color: #2d7cf7;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .copy-btn:hover {
+            background: #2d7cf7;
+            color: white;
+        }
+        .error-text {
+            margin-top: 12px;
+            text-align: center;
+            font-size: 15px;
+            color: #d32f2f;
+            height: 22px;
+        }
+        /* 隐藏临时复制输入框 */
+        #tempCopyInput {
+            position: absolute;
+            opacity: 0;
+            width: 1px;
+            height: 1px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>ZTE 解锁密码计算器</h2>
+        <div class="desc-tip">请输入设备 IMEI 的最后 <b>6 位数字</b>，点击计算获取解锁密码</div>
+
+        <div class="input-box">
+            <label for="imei">IMEI 末尾6位</label>
+            <input type="text" id="imei" maxlength="6" placeholder="示例：123456">
+        </div>
+
+        <button class="btn-calc" onclick="calcPassword()">一键计算密码</button>
+
+        <div class="error-text" id="error"></div>
+
+        <div class="result-wrap" id="resultWrap">
+            <div class="result-text" id="result"></div>
+            <button class="copy-btn" onclick="copyPwd()">复制密码</button>
+        </div>
+    </div>
+
+    <!-- 用于兼容本地文件复制的隐藏输入框 -->
+    <input type="text" id="tempCopyInput">
+
+    <script>
+        let currentPwd = '';
+
+        // 密码算法
+        function zteUnlockPassword(imeiLast6) {
+            const weights = [2, 3, 4, 5, 6, 7];
+            let passwordChars = Array(6).fill('');
+            for (let i = 5; i >= 0; i--) {
+                let digit = parseInt(imeiLast6[5 - i], 10);
+                let weight = weights[5 - i];
+                let product = digit * weight;
+                let remainder = product % 10;
+                passwordChars[i] = remainder.toString();
+            }
+            return passwordChars.join('');
+        }
+
+        // 计算逻辑
+        function calcPassword() {
+            const input = document.getElementById('imei');
+            const resultWrap = document.getElementById('resultWrap');
+            const resultText = document.getElementById('result');
+            const errorBox = document.getElementById('error');
+            let val = input.value.trim();
+
+            resultWrap.style.display = 'none';
+            errorBox.innerText = '';
+
+            // 校验6位纯数字
+            if (!/^\d{6}$/.test(val)) {
+                errorBox.innerText = '请输入6位纯数字IMEI尾号';
+                input.focus();
+                return;
+            }
+
+            currentPwd = zteUnlockPassword(val);
+            resultText.innerText = `解锁密码：${currentPwd}`;
+            resultWrap.style.display = 'block';
+        }
+
+        // 兼容本地文件复制方法（修复无法复制问题）
+        function copyPwd() {
+            const tempInput = document.getElementById('tempCopyInput');
+            tempInput.value = currentPwd;
+            tempInput.select();
+            tempInput.setSelectionRange(0, tempInput.value.length);
+            try {
+                // 传统复制方案（本地html可用）
+                document.execCommand('copy');
+                alert('密码复制成功！');
+            } catch (err) {
+                // 兜底Clipboard方案
+                navigator.clipboard.writeText(currentPwd).then(() => {
+                    alert('密码复制成功！');
+                }).catch(() => {
+                    alert('自动复制失败，请手动选中密码复制');
+                });
+            }
+        }
+
+        // 回车触发计算
+        document.getElementById('imei').addEventListener('keydown', e => {
+            if (e.key === 'Enter') calcPassword();
+        })
+    </script>
+</body>
+</html>
