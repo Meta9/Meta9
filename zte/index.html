@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ZTE 解锁密码计算器</title>
     <style>
         * {
@@ -101,20 +101,19 @@
             font-weight: bold;
             color: #0f8538;
             letter-spacing: 2px;
-        }
-        .copy-btn {
-            margin-top: 10px;
-            padding: 6px 16px;
-            border: 1px solid #2d7cf7;
-            background: transparent;
-            color: #2d7cf7;
-            border-radius: 6px;
             cursor: pointer;
-            transition: 0.2s;
+            user-select: none;
+            padding: 6px;
+            border-radius: 8px;
+            transition: background 0.2s;
         }
-        .copy-btn:hover {
-            background: #2d7cf7;
-            color: white;
+        .result-text:active {
+            background: #d7ecff;
+        }
+        .copy-tip {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #6699cc;
         }
         .error-text {
             margin-top: 12px;
@@ -123,12 +122,25 @@
             color: #d32f2f;
             height: 22px;
         }
-        /* 隐藏临时复制输入框 */
-        #tempCopyInput {
-            position: absolute;
+        /* 隐藏复制用临时输入框 */
+        #copyTemp {
+            position: fixed;
+            left: -9999px;
             opacity: 0;
-            width: 1px;
-            height: 1px;
+        }
+        /* 轻提示弹窗 */
+        .toast {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.75);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 999;
+            display: none;
         }
     </style>
 </head>
@@ -147,32 +159,34 @@
         <div class="error-text" id="error"></div>
 
         <div class="result-wrap" id="resultWrap">
-            <div class="result-text" id="result"></div>
-            <button class="copy-btn" onclick="copyPwd()">复制密码</button>
+            <div class="result-text" id="result" onclick="autoCopy()"></div>
+            <div class="copy-tip">点击上方密码文字一键复制</div>
         </div>
     </div>
 
-    <!-- 用于兼容本地文件复制的隐藏输入框 -->
-    <input type="text" id="tempCopyInput">
+    <!-- 复制临时容器 -->
+    <input id="copyTemp" readonly>
+    <!-- 复制成功提示 -->
+    <div class="toast" id="toast">复制成功</div>
 
     <script>
         let currentPwd = '';
+        const toast = document.getElementById('toast');
 
-        // 密码算法
+        // 中兴密码计算算法
         function zteUnlockPassword(imeiLast6) {
             const weights = [2, 3, 4, 5, 6, 7];
             let passwordChars = Array(6).fill('');
             for (let i = 5; i >= 0; i--) {
                 let digit = parseInt(imeiLast6[5 - i], 10);
                 let weight = weights[5 - i];
-                let product = digit * weight;
-                let remainder = product % 10;
+                let remainder = (digit * weight) % 10;
                 passwordChars[i] = remainder.toString();
             }
             return passwordChars.join('');
         }
 
-        // 计算逻辑
+        // 计算密码
         function calcPassword() {
             const input = document.getElementById('imei');
             const resultWrap = document.getElementById('resultWrap');
@@ -183,7 +197,6 @@
             resultWrap.style.display = 'none';
             errorBox.innerText = '';
 
-            // 校验6位纯数字
             if (!/^\d{6}$/.test(val)) {
                 errorBox.innerText = '请输入6位纯数字IMEI尾号';
                 input.focus();
@@ -195,27 +208,32 @@
             resultWrap.style.display = 'block';
         }
 
-        // 兼容本地文件复制方法（修复无法复制问题）
-        function copyPwd() {
-            const tempInput = document.getElementById('tempCopyInput');
-            tempInput.value = currentPwd;
-            tempInput.select();
-            tempInput.setSelectionRange(0, tempInput.value.length);
+        // 点击密码自动复制（电脑+手机双兼容）
+        function autoCopy() {
+            const temp = document.getElementById('copyTemp');
+            temp.value = currentPwd;
+            temp.select();
+            temp.setSelectionRange(0, temp.value.length);
+
+            let copySuccess = false;
+            // 方案1：传统复制（本地HTML优先）
             try {
-                // 传统复制方案（本地html可用）
-                document.execCommand('copy');
-                alert('密码复制成功！');
-            } catch (err) {
-                // 兜底Clipboard方案
-                navigator.clipboard.writeText(currentPwd).then(() => {
-                    alert('密码复制成功！');
-                }).catch(() => {
-                    alert('自动复制失败，请手动选中密码复制');
-                });
+                if (document.execCommand('copy')) copySuccess = true;
+            } catch(e) {}
+
+            // 方案2：现代Clipboard API兜底
+            if (!copySuccess) {
+                navigator.clipboard.writeText(currentPwd)
+                    .then(() => copySuccess = true)
+                    .catch(() => {});
             }
+
+            // 弹出轻提示
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', 1200);
         }
 
-        // 回车触发计算
+        // 回车快速计算
         document.getElementById('imei').addEventListener('keydown', e => {
             if (e.key === 'Enter') calcPassword();
         })
